@@ -29,13 +29,16 @@ st.markdown("""
     background: linear-gradient(135deg, #07111f, #101d32);
     color: #edf4ff;
 }
+
 h1, h2, h3 {
     color: #eaf2ff;
 }
+
 .subtitle {
     color: #9db1cc;
     font-size: 17px;
 }
+
 .panel {
     background: #14243b;
     padding: 22px;
@@ -43,6 +46,7 @@ h1, h2, h3 {
     border-radius: 14px;
     margin-bottom: 15px;
 }
+
 .small {
     color: #9db1cc;
     font-size: 13px;
@@ -56,7 +60,10 @@ h1, h2, h3 {
 
 @st.cache_resource(show_spinner=False)
 def load_detector():
-    processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
+
+    processor = AutoImageProcessor.from_pretrained(
+        MODEL_NAME
+    )
 
     model = AutoModelForImageClassification.from_pretrained(
         MODEL_NAME
@@ -99,28 +106,42 @@ if uploaded:
 
     image_bytes = uploaded.getvalue()
 
-    fingerprint = hashlib.sha256(image_bytes).hexdigest()
+    fingerprint = hashlib.sha256(
+        image_bytes
+    ).hexdigest()
 
     try:
-        original_image = Image.open(io.BytesIO(image_bytes))
+
+        original_image = Image.open(
+            io.BytesIO(image_bytes)
+        )
+
         original_image.load()
 
         image_format = original_image.format or "Unknown"
+
         image_width, image_height = original_image.size
+
         color_mode = original_image.mode
 
         image = original_image.convert("RGB")
 
     except Exception:
+
         st.error("Unable to read this image.")
+
         st.stop()
 
-    # Reset previous results for a new image
+    # ======================================
+    # RESET RESULTS FOR NEW IMAGE
+    # ======================================
+
     if st.session_state.get("current_fingerprint") != fingerprint:
 
         st.session_state["current_fingerprint"] = fingerprint
 
         st.session_state.pop("detector_result", None)
+
         st.session_state.pop("detector_error", None)
 
     # ======================================
@@ -130,11 +151,18 @@ if uploaded:
     col1, col2 = st.columns(2)
 
     with col1:
+
         st.subheader("Uploaded Image")
-        st.image(image, use_container_width=True)
+
+        st.image(
+            image,
+            use_container_width=True
+        )
+
         st.caption(uploaded.name)
 
     with col2:
+
         st.subheader("File Information")
 
         st.write("**Format:**", image_format)
@@ -152,6 +180,7 @@ if uploaded:
         )
 
         st.write("**SHA-256 Fingerprint**")
+
         st.code(fingerprint)
 
     # ======================================
@@ -159,9 +188,11 @@ if uploaded:
     # ======================================
 
     st.divider()
+
     st.subheader("📋 Metadata Inspection")
 
     try:
+
         exif_data = original_image.getexif()
 
         if exif_data:
@@ -170,20 +201,26 @@ if uploaded:
 
             for key, value in exif_data.items():
 
-                name = ExifTags.TAGS.get(key, str(key))
+                name = ExifTags.TAGS.get(
+                    key,
+                    str(key)
+                )
 
                 metadata[name] = str(value)[:300]
 
             st.json(metadata)
 
         else:
+
             st.warning(
                 "No EXIF metadata found. This does not prove "
                 "that the image is AI-generated."
             )
 
     except Exception:
+
         exif_data = {}
+
         st.warning("Metadata could not be read.")
 
     # ======================================
@@ -191,6 +228,7 @@ if uploaded:
     # ======================================
 
     st.divider()
+
     st.subheader("🤖 AI Image Detection")
 
     st.markdown("### OpenFake SwinV2")
@@ -201,7 +239,10 @@ if uploaded:
         "scaling factor of 2."
     )
 
-    if st.button("Analyse Image", use_container_width=True):
+    if st.button(
+        "Analyse Image",
+        use_container_width=True
+    ):
 
         try:
 
@@ -230,16 +271,23 @@ if uploaded:
                 # Index 0 = real
                 # Index 1 = fake / AI-generated
 
-                ai_score = float(probabilities[1].item())
+                ai_score = float(
+                    probabilities[1].item()
+                )
 
-                human_score = float(probabilities[0].item())
+                human_score = float(
+                    probabilities[0].item()
+                )
 
                 st.session_state["detector_result"] = {
                     "ai": ai_score,
                     "human": human_score
                 }
 
-                st.session_state.pop("detector_error", None)
+                st.session_state.pop(
+                    "detector_error",
+                    None
+                )
 
         except Exception as error:
 
@@ -293,13 +341,16 @@ if uploaded:
 
     else:
 
-        st.info("Select Analyse Image to run the AI detector.")
+        st.info(
+            "Select Analyse Image to run the AI detector."
+        )
 
     # ======================================
     # VERIFICATION REPORT
     # ======================================
 
     st.divider()
+
     st.subheader("📄 Verification Report")
 
     result = st.session_state.get("detector_result")
@@ -307,8 +358,10 @@ if uploaded:
     if result:
 
         detector_text = (
-            f"AI-generated score: {result['ai'] * 100:.2f}%\n"
-            f"Human-created score: {result['human'] * 100:.2f}%"
+            f"AI-generated score: "
+            f"{result['ai'] * 100:.2f}%\n"
+            f"Human-created score: "
+            f"{result['human'] * 100:.2f}%"
         )
 
     else:
@@ -353,21 +406,31 @@ OpenFake model licence: CC-BY-NC-4.0 (non-commercial use).
         use_container_width=True
     )
 
+# ==========================================
+# WELCOME SCREEN
+# ==========================================
+
 else:
 
-    st.markdown("""
-    <div class="panel">
-        <h3>Welcome to VERISCOPE</h3>
+    st.markdown(
+        """
+        <div class="panel">
 
-        <p>Upload an image to begin digital verification.</p>
+            <h3>Welcome to VERISCOPE</h3>
 
-        <p class="small">
-        AI Image Detection • Metadata Inspection • SHA-256
-        Fingerprinting • Verification Reports
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+            <p>
+                Upload an image to begin digital verification.
+            </p>
 
+            <p class="small">
+                AI Image Detection • Metadata Inspection • SHA-256
+                Fingerprinting • Verification Reports
+            </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 # ==========================================
 # FOOTER
