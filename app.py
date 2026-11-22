@@ -1,18 +1,17 @@
 
 import streamlit as st
 from PIL import Image, ExifTags
-from transformers import pipeline, AutoImageProcessor, AutoModelForImageClassification
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 import torch
 import hashlib
 import io
 from datetime import datetime
 
 # ==========================================
-# VERISCOPE
+# VERISCOPE - SINGLE DETECTOR VERSION
 # ==========================================
 
-MODEL_ONE = "dima806/ai_vs_human_generated_image_detection"
-MODEL_TWO = "bendavidsteel/openfake-swinv2-base"
+MODEL_NAME = "bendavidsteel/openfake-swinv2-base"
 
 st.set_page_config(
     page_title="VERISCOPE | Digital Verification",
@@ -56,20 +55,11 @@ h1, h2, h3 {
 # ==========================================
 
 @st.cache_resource(show_spinner=False)
-def load_detector_one():
-    return pipeline(
-        "image-classification",
-        model=MODEL_ONE,
-        device=-1
-    )
-
-
-@st.cache_resource(show_spinner=False)
-def load_detector_two():
-    processor = AutoImageProcessor.from_pretrained(MODEL_TWO)
+def load_detector():
+    processor = AutoImageProcessor.from_pretrained(MODEL_NAME)
 
     model = AutoModelForImageClassification.from_pretrained(
-        MODEL_TWO
+        MODEL_NAME
     )
 
     model.eval()
@@ -92,8 +82,8 @@ st.markdown(
 st.divider()
 
 st.info(
-    "Analyse images using two different AI detection models, "
-    "inspect metadata and generate a digital fingerprint."
+    "Analyse an image with an AI-detection model, inspect its "
+    "metadata and generate a digital fingerprint."
 )
 
 # ==========================================
@@ -125,18 +115,13 @@ if uploaded:
         st.error("Unable to read this image.")
         st.stop()
 
-    # Reset results when a new image is uploaded
+    # Reset previous results for a new image
     if st.session_state.get("current_fingerprint") != fingerprint:
 
         st.session_state["current_fingerprint"] = fingerprint
 
-        for key in [
-            "detector_one_result",
-            "detector_one_error",
-            "detector_two_result",
-            "detector_two_error"
-        ]:
-            st.session_state.pop(key, None)
+        st.session_state.pop("detector_result", None)
+        st.session_state.pop("detector_error", None)
 
     # ======================================
     # FILE INFORMATION
@@ -153,11 +138,14 @@ if uploaded:
         st.subheader("File Information")
 
         st.write("**Format:**", image_format)
+
         st.write(
             "**Dimensions:**",
             f"{image_width} × {image_height}"
         )
+
         st.write("**Color mode:**", color_mode)
+
         st.write(
             "**File size:**",
             f"{len(image_bytes):,} bytes"
@@ -167,7 +155,7 @@ if uploaded:
         st.code(fingerprint)
 
     # ======================================
-    # METADATA
+    # METADATA INSPECTION
     # ======================================
 
     st.divider()
@@ -177,10 +165,13 @@ if uploaded:
         exif_data = original_image.getexif()
 
         if exif_data:
+
             metadata = {}
 
             for key, value in exif_data.items():
+
                 name = ExifTags.TAGS.get(key, str(key))
+
                 metadata[name] = str(value)[:300]
 
             st.json(metadata)
@@ -196,102 +187,30 @@ if uploaded:
         st.warning("Metadata could not be read.")
 
     # ======================================
-    # AI DETECTOR SECTION
+    # AI IMAGE DETECTION
     # ======================================
 
     st.divider()
     st.subheader("🤖 AI Image Detection")
 
-    st.write(
-        "VERISCOPE uses two different research models "
-        "to compare image classifications."
-    )
-
-    st.markdown("### Detector 1 — Dima806")
-
-    if st.button(
-        "Analyse with Detector 1",
-        use_container_width=True
-    ):
-
-        try:
-            with st.spinner("Running Detector 1..."):
-
-                detector = load_detector_one()
-                results = detector(image)
-
-                ai_result = next(
-                    (
-                        item for item in results
-                        if item["label"].strip().lower()
-                        == "ai-generated"
-                    ),
-                    None
-                )
-
-                human_result = next(
-                    (
-                        item for item in results
-                        if item["label"].strip().lower()
-                        == "human"
-                    ),
-                    None
-                )
-
-                if ai_result is None or human_result is None:
-                    raise ValueError(
-                        f"Unexpected labels: {results}"
-                    )
-
-                st.session_state["detector_one_result"] = {
-                    "ai": float(ai_result["score"]),
-                    "human": float(human_result["score"])
-                }
-
-                st.session_state.pop("detector_one_error", None)
-
-        except Exception as error:
-            st.session_state["detector_one_error"] = str(error)
-
-    if "detector_one_result" in st.session_state:
-
-        result = st.session_state["detector_one_result"]
-
-        a, b = st.columns(2)
-
-        a.metric("AI-generated", f"{result['ai'] * 100:.2f}%")
-        b.metric("Human-created", f"{result['human'] * 100:.2f}%")
-
-    elif "detector_one_error" in st.session_state:
-
-        st.error(
-            "Detector 1 failed: "
-            + st.session_state["detector_one_error"][:400]
-        )
-
-    # ======================================
-    # SECOND DETECTOR
-    # ======================================
-
-    st.markdown("### Detector 2 — OpenFake SwinV2")
+    st.markdown("### OpenFake SwinV2")
 
     st.caption(
-        "This detector uses a SwinV2 image-classification model. "
-        "Its model card specifies a temperature scaling factor of 2."
+        "This research model classifies images as real or "
+        "AI-generated. Its model card specifies a temperature "
+        "scaling factor of 2."
     )
 
-    if st.button(
-        "Analyse with Detector 2",
-        use_container_width=True
-    ):
+    if st.button("Analyse Image", use_container_width=True):
 
         try:
+
             with st.spinner(
-                "Loading OpenFake model and analysing image. "
-                "The first download may take several minutes..."
+                "Loading OpenFake and analysing image. "
+                "The first model download may take several minutes..."
             ):
 
-                processor, model = load_detector_two()
+                processor, model = load_detector()
 
                 inputs = processor(
                     images=image,
@@ -299,6 +218,7 @@ if uploaded:
                 )
 
                 with torch.no_grad():
+
                     logits = model(**inputs).logits
 
                 probabilities = torch.softmax(
@@ -306,98 +226,74 @@ if uploaded:
                     dim=-1
                 )[0]
 
+                # Model labels:
+                # Index 0 = real
+                # Index 1 = fake / AI-generated
+
                 ai_score = float(probabilities[1].item())
+
                 human_score = float(probabilities[0].item())
 
-                st.session_state["detector_two_result"] = {
+                st.session_state["detector_result"] = {
                     "ai": ai_score,
                     "human": human_score
                 }
 
-                st.session_state.pop("detector_two_error", None)
+                st.session_state.pop("detector_error", None)
 
         except Exception as error:
 
-            st.session_state["detector_two_error"] = str(error)
+            st.session_state["detector_error"] = str(error)
 
-    if "detector_two_result" in st.session_state:
+    # ======================================
+    # DISPLAY RESULTS
+    # ======================================
 
-        result = st.session_state["detector_two_result"]
+    if "detector_result" in st.session_state:
+
+        result = st.session_state["detector_result"]
 
         a, b = st.columns(2)
 
-        a.metric("AI-generated", f"{result['ai'] * 100:.2f}%")
-        b.metric("Human-created", f"{result['human'] * 100:.2f}%")
-
-    elif "detector_two_error" in st.session_state:
-
-        st.error(
-            "Detector 2 failed: "
-            + st.session_state["detector_two_error"][:400]
+        a.metric(
+            "AI-generated",
+            f"{result['ai'] * 100:.2f}%"
         )
 
-    # ======================================
-    # COMPARISON
-    # ======================================
-
-    st.divider()
-    st.subheader("📊 Detector Comparison")
-
-    one = st.session_state.get("detector_one_result")
-    two = st.session_state.get("detector_two_result")
-
-    if one and two:
-
-        one_label = (
-            "AI-generated" if one["ai"] >= 0.5 else "Human-created"
+        b.metric(
+            "Human-created",
+            f"{result['human'] * 100:.2f}%"
         )
 
-        two_label = (
-            "AI-generated" if two["ai"] >= 0.5 else "Human-created"
-        )
+        if result["ai"] >= 0.5:
 
-        comparison_col1, comparison_col2 = st.columns(2)
-
-        with comparison_col1:
-            st.write("**Detector 1**")
-            st.write(one_label)
-            st.progress(one["ai"])
-
-        with comparison_col2:
-            st.write("**Detector 2**")
-            st.write(two_label)
-            st.progress(two["ai"])
-
-        if one_label == two_label:
-
-            st.success(
-                f"Both models agree: {one_label}."
+            st.warning(
+                "The model classifies this image as more likely "
+                "AI-generated."
             )
 
         else:
 
-            st.warning(
-                "MODEL DISAGREEMENT: The detectors produced "
-                "different classifications. Manual verification "
-                "is recommended."
+            st.success(
+                "The model classifies this image as more likely "
+                "real / human-created."
             )
 
         st.caption(
-            "Agreement does not prove correctness. The models "
-            "may share weaknesses and can both be wrong."
+            "This is an automated model estimate, not proof of "
+            "authenticity. The model can make mistakes."
         )
 
-    elif one or two:
+    elif "detector_error" in st.session_state:
 
-        st.info(
-            "Run both detectors to see their comparison."
+        st.error(
+            "The detector could not analyse this image: "
+            + st.session_state["detector_error"][:500]
         )
 
     else:
 
-        st.info(
-            "No detector results yet. Run both analyses above."
-        )
+        st.info("Select Analyse Image to run the AI detector.")
 
     # ======================================
     # VERIFICATION REPORT
@@ -406,14 +302,18 @@ if uploaded:
     st.divider()
     st.subheader("📄 Verification Report")
 
-    def result_text(result):
-        if result is None:
-            return "Not completed"
+    result = st.session_state.get("detector_result")
 
-        return (
-            f"AI-generated: {result['ai'] * 100:.2f}%\n"
-            f"Human-created: {result['human'] * 100:.2f}%"
+    if result:
+
+        detector_text = (
+            f"AI-generated score: {result['ai'] * 100:.2f}%\n"
+            f"Human-created score: {result['human'] * 100:.2f}%"
         )
+
+    else:
+
+        detector_text = "Not completed"
 
     report = f"""
 VERISCOPE - DIGITAL CONTENT VERIFICATION REPORT
@@ -424,27 +324,25 @@ FILE INFORMATION
 Name: {uploaded.name}
 Format: {image_format}
 Dimensions: {image_width} x {image_height}
+Color mode: {color_mode}
 Size: {len(image_bytes)} bytes
 
-SHA-256
+SHA-256 FINGERPRINT
 {fingerprint}
 
 METADATA
 EXIF present: {"Yes" if exif_data else "No"}
 
-DETECTOR 1 - DIMA806
-{result_text(one)}
-
-DETECTOR 2 - OPENFAKE SWINV2
-{result_text(two)}
+AI IMAGE DETECTION
+Model: {MODEL_NAME}
+{detector_text}
 
 DISCLAIMER
-These are automated model estimates, not proof of authenticity.
+The model output is an automated estimate, not proof of authenticity.
+The model can make mistakes. Additional evidence and human review
+may be needed before deciding whether an image is authentic.
 
-Model agreement does not guarantee correctness.
-Images should be evaluated with additional evidence.
-
-OpenFake model licence: CC-BY-NC-4.0.
+OpenFake model licence: CC-BY-NC-4.0 (non-commercial use).
 """
 
     st.download_button(
@@ -460,13 +358,16 @@ else:
     st.markdown("""
     <div class="panel">
         <h3>Welcome to VERISCOPE</h3>
+
         <p>Upload an image to begin digital verification.</p>
+
         <p class="small">
-        Two AI Detectors • Metadata Inspection • SHA-256
-        Fingerprinting • Detector Comparison • Reports
+        AI Image Detection • Metadata Inspection • SHA-256
+        Fingerprinting • Verification Reports
         </p>
     </div>
     """, unsafe_allow_html=True)
+
 
 # ==========================================
 # FOOTER
