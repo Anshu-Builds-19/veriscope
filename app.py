@@ -8,7 +8,7 @@ import io
 from datetime import datetime
 
 # ==========================================
-# VERISCOPE - SINGLE DETECTOR VERSION
+# VERISCOPE - DIGITAL CONTENT VERIFICATION
 # ==========================================
 
 MODEL_NAME = "bendavidsteel/openfake-swinv2-base"
@@ -39,20 +39,20 @@ h1, h2, h3 {
     font-size: 17px;
 }
 
-.panel {
-    background: #14243b;
-    padding: 22px;
-    border: 1px solid #29415f;
-    border-radius: 14px;
-    margin-bottom: 15px;
-}
-
 .small {
     color: #9db1cc;
     font-size: 13px;
 }
+
+div[data-testid="stMetric"] {
+    background: #14243b;
+    padding: 16px;
+    border: 1px solid #29415f;
+    border-radius: 12px;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 # ==========================================
 # MODEL LOADING
@@ -93,6 +93,7 @@ st.info(
     "metadata and generate a digital fingerprint."
 )
 
+
 # ==========================================
 # IMAGE UPLOAD
 # ==========================================
@@ -102,6 +103,7 @@ uploaded = st.file_uploader(
     type=["jpg", "jpeg", "png"]
 )
 
+
 if uploaded:
 
     image_bytes = uploaded.getvalue()
@@ -109,6 +111,10 @@ if uploaded:
     fingerprint = hashlib.sha256(
         image_bytes
     ).hexdigest()
+
+    # ======================================
+    # READ IMAGE
+    # ======================================
 
     try:
 
@@ -132,8 +138,9 @@ if uploaded:
 
         st.stop()
 
+
     # ======================================
-    # RESET RESULTS FOR NEW IMAGE
+    # RESET OLD RESULTS FOR NEW IMAGE
     # ======================================
 
     if st.session_state.get("current_fingerprint") != fingerprint:
@@ -143,6 +150,7 @@ if uploaded:
         st.session_state.pop("detector_result", None)
 
         st.session_state.pop("detector_error", None)
+
 
     # ======================================
     # FILE INFORMATION
@@ -160,6 +168,7 @@ if uploaded:
         )
 
         st.caption(uploaded.name)
+
 
     with col2:
 
@@ -183,6 +192,7 @@ if uploaded:
 
         st.code(fingerprint)
 
+
     # ======================================
     # METADATA INSPECTION
     # ======================================
@@ -190,6 +200,8 @@ if uploaded:
     st.divider()
 
     st.subheader("📋 Metadata Inspection")
+
+    exif_data = {}
 
     try:
 
@@ -221,7 +233,10 @@ if uploaded:
 
         exif_data = {}
 
-        st.warning("Metadata could not be read.")
+        st.warning(
+            "Metadata could not be read."
+        )
+
 
     # ======================================
     # AI IMAGE DETECTION
@@ -267,7 +282,7 @@ if uploaded:
                     dim=-1
                 )[0]
 
-                # Model labels:
+                # Model label order:
                 # Index 0 = real
                 # Index 1 = fake / AI-generated
 
@@ -293,22 +308,23 @@ if uploaded:
 
             st.session_state["detector_error"] = str(error)
 
+
     # ======================================
-    # DISPLAY RESULTS
+    # DISPLAY DETECTION RESULTS
     # ======================================
 
     if "detector_result" in st.session_state:
 
         result = st.session_state["detector_result"]
 
-        a, b = st.columns(2)
+        col1, col2 = st.columns(2)
 
-        a.metric(
+        col1.metric(
             "AI-generated",
             f"{result['ai'] * 100:.2f}%"
         )
 
-        b.metric(
+        col2.metric(
             "Human-created",
             f"{result['human'] * 100:.2f}%"
         )
@@ -332,6 +348,7 @@ if uploaded:
             "authenticity. The model can make mistakes."
         )
 
+
     elif "detector_error" in st.session_state:
 
         st.error(
@@ -344,6 +361,7 @@ if uploaded:
         st.info(
             "Select Analyse Image to run the AI detector."
         )
+
 
     # ======================================
     # VERIFICATION REPORT
@@ -367,6 +385,7 @@ if uploaded:
     else:
 
         detector_text = "Not completed"
+
 
     report = f"""
 VERISCOPE - DIGITAL CONTENT VERIFICATION REPORT
@@ -398,6 +417,7 @@ may be needed before deciding whether an image is authentic.
 OpenFake model licence: CC-BY-NC-4.0 (non-commercial use).
 """
 
+
     st.download_button(
         "⬇ Download Verification Report",
         data=report,
@@ -406,31 +426,26 @@ OpenFake model licence: CC-BY-NC-4.0 (non-commercial use).
         use_container_width=True
     )
 
+
 # ==========================================
 # WELCOME SCREEN
 # ==========================================
 
 else:
 
-    st.markdown(
-        """
-        <div class="panel">
+    with st.container(border=True):
 
-            <h3>Welcome to VERISCOPE</h3>
+        st.subheader("Welcome to VERISCOPE")
 
-            <p>
-                Upload an image to begin digital verification.
-            </p>
+        st.write(
+            "Upload an image to begin digital verification."
+        )
 
-            <p class="small">
-                AI Image Detection • Metadata Inspection • SHA-256
-                Fingerprinting • Verification Reports
-            </p>
+        st.caption(
+            "AI Image Detection • Metadata Inspection • "
+            "SHA-256 Fingerprinting • Verification Reports"
+        )
 
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
 
 # ==========================================
 # FOOTER
